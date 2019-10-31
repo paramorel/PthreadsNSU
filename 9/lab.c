@@ -11,7 +11,7 @@
 
 pthread_mutex_t forks[COUNT_OF_PHILOSOPHERS];
 pthread_t philosophers[COUNT_OF_PHILOSOPHERS];
-pthread_mutex_t foodlock;
+pthread_mutex_t foodlock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t startTaking = PTHREAD_MUTEX_INITIALIZER;//for second solution
 
 void* philosopher(void* parameter);
@@ -103,7 +103,6 @@ void downForks(int f1, int f2){
 
 int main(int argc, char* argv[]){
 
-    pthread_mutex_init(&foodlock, NULL);
     for (int i = 0; i < COUNT_OF_PHILOSOPHERS; i++){
         if(0 != pthread_mutex_init(&forks[i], NULL)){
             fprintf(stderr, "pthread_mutex_init error");
@@ -133,9 +132,6 @@ int main(int argc, char* argv[]){
         }
     }
 
-    if(0 != pthread_mutex_destroy(&foodlock)){
-        fprintf(stderr, "pthread_mutex_destroy error(foodlock)");
-    }
 
     for (int i = 0; i < COUNT_OF_PHILOSOPHERS; i++){
         if(0 != pthread_mutex_destroy(&forks[i])){
