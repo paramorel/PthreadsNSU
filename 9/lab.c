@@ -12,7 +12,7 @@
 pthread_mutex_t forks[COUNT_OF_PHILOSOPHERS];
 pthread_t philosophers[COUNT_OF_PHILOSOPHERS];
 pthread_mutex_t foodlock;
-pthread_mutex_t startTaking = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t startTaking = PTHREAD_MUTEX_INITIALIZER;//for second solution
 
 void* philosopher(void* parameter);
 int foodOnTable();
@@ -29,13 +29,27 @@ void* philosopher(void* parameter){
 
     while (f = foodOnTable()) {
         fprintf (stdout, "Philosopher %d: get dish %d.\n", id, f);
-        if (id == 0){
+        if (id == 0){//first solution
             getFork(id, leftFork, "left");
             getFork(id, rightFork, "right");
         } else {
             getFork(id, rightFork, "right");
             getFork(id, leftFork, "left");
-        }  
+        }
+
+        /*if (0 != pthread_mutex_lock(&startTaking)){   ///////second solution
+            fprintf(stderr, "pthread_mutex_lock error");
+            exit(EXIT_FAILURE);
+        }
+
+        getFork(id, rightFork, "right");
+        getFork(id, leftFork, "left");
+
+        if (0!= pthread_mutex_unlock(&startTaking)){
+            fprintf(stderr, "pthread_mutex_unlock error");
+            exit(EXIT_FAILURE);
+        }*/
+        
         fprintf(stdout, "Philosopher %d: eating.\n", id);
         usleep(DELAY * (FOOD - f + 1));
         downForks(leftFork, rightFork);
