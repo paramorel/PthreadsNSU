@@ -13,7 +13,7 @@
 int countOfThreads;
 int stopFlag = 0;
 long checkInterval = 1000000;
-long maxStepsDone = 0;
+long maxCountSteps = 0;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_barrier_t barrier;
 
@@ -45,8 +45,8 @@ void* calculate(void* parameters){
             errorCode = pthread_mutex_lock(&mutex);
             checkMutexError(errorCode, "pthread_mutex_lock error");
 
-            if (i > maxStepsDone){
-                maxStepsDone = i;
+            if (i > maxCountSteps){
+                maxCountSteps = i;
             }
 
             errorCode = pthread_mutex_unlock(&mutex);
@@ -55,9 +55,9 @@ void* calculate(void* parameters){
             lastIterationFlag = 1;
             pthread_barrier_wait(&barrier);
 
-            if (i < maxStepsDone){
+            if (i < maxCountSteps){
                 fprintf(stderr, "not enough iterations in thread %d\n", shift);
-                nextCheck = maxStepsDone;
+                nextCheck = maxCountSteps;
             } else {
                 fprintf(stdout, "Well done in thread %d\n", shift);
                 break;
