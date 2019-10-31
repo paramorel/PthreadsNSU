@@ -134,8 +134,7 @@ int main(int argc, char* argv[]){
 
     for (int i = 0; i < COUNT_OF_PHILOSOPHERS; i++){
         if(0 != pthread_mutex_destroy(&forks[i])){
-            fprintf(stderr, "pthread_mutex_destroy error(forks)");
-            return EXIT_FAILURE;
+            fprintf(stderr, "pthread_mutex_destroy error (%d mutex)\n", i);
         }
     }
 
