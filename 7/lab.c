@@ -96,6 +96,11 @@ int main(int argc, char* argv[]){
     pi *= CONSTANT_FROM_ROW_LEIBNITZ;
     fprintf(stdout, "%.16f\n", pi);
     fprintf(stdout, "You used %d threads\n", countOfThreads);
+    
+    if (MAX_COUNT_OF_THREADS == countOfThreads){
+        fprintf(stdout, "This is the maximum possible number of threads\n");
+    }
+
     free(parameters);
 
     return EXIT_SUCCESS;
