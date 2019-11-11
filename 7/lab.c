@@ -10,17 +10,18 @@
 #define CONSTANT_FROM_ROW_LEIBNITZ 4
 #define MAX_COUNT_OF_THREADS 3900
 
-int countOfThreads;
 
 typedef struct LocalThreadData {
     int firstElement;
     double partSum;
+    long countOfThreads;
 } LocalThreadData;
 
 void* calculate(void* parameters){
     assert(NULL != parameters);
     double localPi = 0.0;
     int i=((LocalThreadData*)parameters)->firstElement;
+    long countOfThreads = ((LocalThreadData*)parameters)->countOfThreads;
 
     for (i; i < COUNT_OF_STEPS; i+=countOfThreads){
         localPi += 1.0/(i * 4.0 + 1.0);
@@ -40,14 +41,14 @@ void* calculate(void* parameters){
 int main(int argc, char* argv[]){
 
     if (COUNT_OF_ARGUMENTS != argc){
-        fprintf(stderr, "Invalid arguments");
+        fprintf(stderr, "Invalid arguments\n");
         return EXIT_FAILURE;
     }
 
-    countOfThreads = atoi(argv[1]);
+    long countOfThreads = atol(argv[1]);
 
     if (MIN_COUNT_OF_THREADS > countOfThreads){
-        fprintf(stderr, "You should use at least one thread");
+        fprintf(stderr, "You should use at least one thread\n");
         return EXIT_FAILURE;
     }
 
@@ -68,6 +69,7 @@ int main(int argc, char* argv[]){
     for (int i = 0; i < countOfThreads; i++){
         parameters[i].firstElement = i;
         parameters[i].partSum = 0;
+        parameters[i].countOfThreads = countOfThreads;
         if (0 != pthread_create(&threads[i], NULL, calculate, (void*)(parameters + i))){
             perror("pthread_create error");
 
@@ -95,7 +97,7 @@ int main(int argc, char* argv[]){
 
     pi *= CONSTANT_FROM_ROW_LEIBNITZ;
     fprintf(stdout, "%.16f\n", pi);
-    fprintf(stdout, "You used %d threads\n", countOfThreads);
+    fprintf(stdout, "You used %ld threads\n", countOfThreads);
     
     if (MAX_COUNT_OF_THREADS == countOfThreads){
         fprintf(stdout, "This is the maximum possible number of threads\n");
