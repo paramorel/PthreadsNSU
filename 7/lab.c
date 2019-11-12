@@ -45,7 +45,14 @@ int main(int argc, char* argv[]){
         return EXIT_FAILURE;
     }
 
-    long countOfThreads = atol(argv[1]);
+    int base = 10;
+    long countOfThreads = strtol(argv[1], NULL, base);
+
+    if (0 != errno){
+        perror("strtol error");
+        fprintf(stderr, "Invalid argument. Enter other number\n");
+        return EXIT_FAILURE;
+    }
 
     if (MIN_COUNT_OF_THREADS > countOfThreads){
         fprintf(stderr, "You should use at least one thread\n");
