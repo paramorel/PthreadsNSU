@@ -63,11 +63,6 @@ void cleanResources(){
             perror("pthread_mutex_destroy error");
         }
     }
-
-    if(0 != (errorCode = pthread_mutexattr_destroy(&mutexAttr))){
-        errno = errorCode;
-        perror("pthread_mutexattr_init error")
-    }
 }
 
 void initMutexes(){
