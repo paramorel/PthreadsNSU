@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sched.h>
 
 #define COUNT_OF_LINES_TO_PRINT 10
 #define COUNT_OF_MUTEXES 3
@@ -27,7 +28,7 @@ void *printMessage(void *threadData) {
         lockMutex(&mutex[2]);
         unlockMutex(&mutex[1]);
 
-        fprintf(stdout, "It's a child thread\n");
+        fprintf(stdout, "Child thread\n");
 
         lockMutex(&mutex[0]);
         unlockMutex(&mutex[2]);
@@ -114,7 +115,7 @@ int main(int argc, char *argv[]) {
         lockMutex(&mutex[2]);
         unlockMutex(&mutex[1]);
 
-        fprintf(stdout, "It's a main thread\n");
+        fprintf(stdout, "Main thread\n");
 
         lockMutex(&mutex[0]);
         unlockMutex(&mutex[2]);
