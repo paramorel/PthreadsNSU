@@ -10,7 +10,7 @@
 
 pthread_mutex_t mutex[2];
 pthread_mutexattr_t mutexAttr;
-int childStarted = 0;
+static int childStarted = 0;
 
 void initMutexes();
 void cleanResources();
