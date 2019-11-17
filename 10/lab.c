@@ -8,8 +8,8 @@
 #define COUNT_OF_LINES_TO_PRINT 10
 #define COUNT_OF_MUTEXES 3
 
-pthread_mutex_t mutex[2];
-pthread_mutexattr_t mutexAttr;
+static pthread_mutex_t mutex[2];
+static pthread_mutexattr_t mutexAttr;
 static int childStarted = 0;
 
 void initMutexes();
@@ -38,53 +38,64 @@ void *printMessage(void *threadData) {
 }
 
 void lockMutex(pthread_mutex_t* mutex){
-    if (0 != pthread_mutex_lock(mutex)){
+    int errorCode = 0;
+    if (0 != (errorCode = pthread_mutex_lock(mutex))){
+        errno = errorCode;
         perror("pthread_mutex_lock error");
         exit(EXIT_FAILURE);
     }
 }
 
 void unlockMutex(pthread_mutex_t* mutex){
-    if (0 != pthread_mutex_unlock(mutex)){
+    int errorCode = 0;
+    if (0 != (errorCode = pthread_mutex_unlock(mutex))){
+        errno = errorCode;
         perror("pthread_mutex_unlock error");
         exit(EXIT_FAILURE);
     }
 }
 
 void cleanResources(){
-    if (0 != pthread_mutexattr_destroy(&mutexAttr)){
-        perror("pthread_mutexattr_destroy error");
-    }
-
+    int errorCode = 0;
     for (int i = 0; i < COUNT_OF_MUTEXES; i++){
-        if (0 != pthread_mutex_destroy(&mutex[i])){
+        if (0 != (errorCode = pthread_mutex_destroy(&mutex[i]))){
+            errno = errorCode;
             perror("pthread_mutex_destroy error");
         }
     }
 
+    if(0 != (errorCode = pthread_mutexattr_destroy(&mutexAttr))){
+        errno = errorCode;
+        perror("pthread_mutexattr_init error")
+    }
 }
 
 void initMutexes(){
     int errorCode = 0;
-    if(0 != pthread_mutexattr_init(&mutexAttr)){
+    if(0 != (errorCode = pthread_mutexattr_init(&mutexAttr))){
+        errno = errorCode;
         perror("pthread_mutexattr_init error");
         exit(EXIT_FAILURE);
     }
 
-    if (0 != pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_ERRORCHECK)){
+    if (0 != (errorCode = pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_ERRORCHECK))){
+        errno = errorCode;
         perror("pthread_mutexattr_settype");
         exit(EXIT_FAILURE);
     }
 
     for (int i = 0; i < COUNT_OF_MUTEXES; i++){
-        if (0 != pthread_mutex_init(&mutex[i], &mutexAttr)){
+        if (0 != (errorCode = pthread_mutex_init(&mutex[i], &mutexAttr))){
+            errno = errorCode;
             perror("pthread_mutex_init error");
             for (int j = 0; j < i; j++){
-                if (0 != pthread_mutex_destroy(&mutex[i])){
+                if (0 != (errorCode = pthread_mutex_destroy(&mutex[i]))){
+                    errno = errorCode;
                     perror("pthread_mutex_destroy after init error");
                 }
             }
-            if (0 != pthread_mutexattr_destroy(&mutexAttr)){
+            if (0 != (errorCode = pthread_mutexattr_destroy(&mutexAttr))){
+                errno = errorCode;
                 perror("pthread_mutexattr_destroy after init error");
             }
             exit(EXIT_FAILURE);
@@ -94,18 +105,21 @@ void initMutexes(){
 
 
 int main(int argc, char *argv[]) {
+    int errorCode = 0;
     pthread_t thread;
 
     initMutexes();
 
     lockMutex(&mutex[1]);
-    if (0 != pthread_create(&thread, NULL, printMessage, NULL)) {
+    if (0 != (errorCode = pthread_create(&thread, NULL, printMessage, NULL))) {
+        errno = errorCode;
         perror("pthread_create error");
         return EXIT_FAILURE;
     }
 
     if (!childStarted){
-        if(0 != sched_yield()){
+        if(0 != (errorCode = sched_yield())){
+            errno = errorCode;
             perror("sched_yield error");
             return EXIT_FAILURE;
         }
@@ -125,6 +139,13 @@ int main(int argc, char *argv[]) {
 
     unlockMutex(&mutex[1]);
 
-    pthread_exit(EXIT_SUCCESS);
+    if (0 != (errorCode = pthread_join(thread, NULL))){
+        errno = errorCode;
+        perror("pthread_join error");
+        return EXIT_FAILURE;
+    }
+
+    cleanResources();
+
     return EXIT_SUCCESS;
 }
