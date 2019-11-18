@@ -3,96 +3,114 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <assert.h>
 
 #define COUNT_OF_LINES_TO_PRINT 10
-#define COUNT_OF_MUTEXES 3  
+#define COUNT_OF_MUTEXES 3 
+#define COUNT_OF_THREADS 2 
 
-static pthread_mutex_t mutex[2];
-static pthread_mutexattr_t mutexAttr;
-static int childStarted = 0;
+typedef struct SharedData{
+    int childStarted;
+    pthread_mutex_t mutex[2];
+    pthread_mutexattr_t mutexAttr;
+} SharedData;
 
-void initMutexes();
-void cleanResources();
+void initMutexes(SharedData*);
+void cleanResources(SharedData*);
 void* printMessage(void*);
-void lockMutex(pthread_mutex_t*);
-void unlockMutex(pthread_mutex_t*);
+void lockMutex(pthread_mutex_t*, SharedData*);
+void unlockMutex(pthread_mutex_t*, SharedData*);
 
 
 void *printMessage(void *threadData) {
-    lockMutex(&mutex[2]);
+    assert(NULL != threadData);
+    SharedData* sharedData = (SharedData*)threadData;
+    
+    lockMutex(&(sharedData->mutex[2]), sharedData);
     int k = 2;
-    childStarted = 1;
+    sharedData->childStarted = 1;
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
-        lockMutex(&mutex[(k + 1) % COUNT_OF_MUTEXES]);
+        lockMutex(&(sharedData->mutex[(k + 1) % COUNT_OF_MUTEXES]), sharedData);
 
         fprintf(stdout, "Child thread\n");
 
-        unlockMutex(&mutex[k]);
+        unlockMutex(&(sharedData->mutex[k]), sharedData);
         k = (k + 1) % COUNT_OF_MUTEXES;
     }
 
-    unlockMutex(&mutex[k]);
+    unlockMutex(&(sharedData->mutex[k]), sharedData);
     return NULL;
 }
 
-void lockMutex(pthread_mutex_t* mutex){
+void lockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
     int errorCode = 0;
     if (0 != (errorCode = pthread_mutex_lock(mutex))){
         errno = errorCode;
         perror("pthread_mutex_lock error");
-        cleanResources();
+        cleanResources(sharedData);
+        free(sharedData);
         exit(EXIT_FAILURE);
     }
 }
 
-void unlockMutex(pthread_mutex_t* mutex){
+void unlockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
     int errorCode = 0;
     if (0 != (errorCode = pthread_mutex_unlock(mutex))){
         errno = errorCode;
         perror("pthread_mutex_unlock error");
-        cleanResources();
+        cleanResources(sharedData);
+        free(sharedData);
         exit(EXIT_FAILURE);
     }
 }
 
-void cleanResources(){
+void cleanResources(SharedData* sharedData){
     int errorCode = 0;
     for (int i = 0; i < COUNT_OF_MUTEXES; i++){
-        if (0 != (errorCode = pthread_mutex_destroy(&mutex[i]))){
+        if (0 != (errorCode = pthread_mutex_destroy(&(sharedData->mutex[i])))){
             errno = errorCode;
             perror("pthread_mutex_destroy error");
         }
     }
 }
 
-void initMutexes(){
+void initMutexes(SharedData* sharedData){
     int errorCode = 0;
-    if(0 != (errorCode = pthread_mutexattr_init(&mutexAttr))){
+    if(0 != (errorCode = pthread_mutexattr_init(&(sharedData->mutexAttr)))){
         errno = errorCode;
         perror("pthread_mutexattr_init error");
+        free(sharedData);
         exit(EXIT_FAILURE);
     }
 
-    if (0 != (errorCode = pthread_mutexattr_settype(&mutexAttr, PTHREAD_MUTEX_ERRORCHECK))){
+    if (0 != (errorCode = pthread_mutexattr_settype(&(sharedData->mutexAttr), PTHREAD_MUTEX_ERRORCHECK))){
         errno = errorCode;
         perror("pthread_mutexattr_settype");
+        
+        if (0 != (errorCode = pthread_mutexattr_destroy(&(sharedData->mutexAttr)))){
+            errno = errorCode;
+            perror("pthread_mutexattr_destroy after settype error");
+        }
+
+        free(sharedData);
         exit(EXIT_FAILURE);
     }
 
     for (int i = 0; i < COUNT_OF_MUTEXES; i++){
-        if (0 != (errorCode = pthread_mutex_init(&mutex[i], &mutexAttr))){
+        if (0 != (errorCode = pthread_mutex_init(&(sharedData->mutex[i]), &(sharedData->mutexAttr)))){
             errno = errorCode;
             perror("pthread_mutex_init error");
             for (int j = 0; j < i; j++){
-                if (0 != (errorCode = pthread_mutex_destroy(&mutex[i]))){
+                if (0 != (errorCode = pthread_mutex_destroy(&(sharedData->mutex[i])))){
                     errno = errorCode;
                     perror("pthread_mutex_destroy after init error");
                 }
             }
-            if (0 != (errorCode = pthread_mutexattr_destroy(&mutexAttr))){
+            if (0 != (errorCode = pthread_mutexattr_destroy(&(sharedData->mutexAttr)))){
                 errno = errorCode;
                 perror("pthread_mutexattr_destroy after init error");
             }
+            free(sharedData);
             exit(EXIT_FAILURE);
         }
     }
@@ -103,45 +121,59 @@ int main(int argc, char *argv[]) {
     int errorCode = 0;
     pthread_t thread;
 
-    initMutexes();
+    SharedData* sharedData = (SharedData*)malloc(sizeof(SharedData) * COUNT_OF_THREADS);
 
-    lockMutex(&mutex[0]);
-    if (0 != (errorCode = pthread_create(&thread, NULL, printMessage, NULL))) {
-        errno = errorCode;
-        perror("pthread_create error");
-        cleanResources();
+    if (NULL == sharedData){
+        fprintf(stderr, "Memory allocation error\n");
         return EXIT_FAILURE;
     }
 
-    while (!childStarted){
+    sharedData->childStarted = 0;
+
+    initMutexes(sharedData);
+
+    lockMutex(&(sharedData->mutex[0]), sharedData);
+
+    if (0 != (errorCode = pthread_create(&thread, NULL, printMessage, (void*)sharedData))) {
+        errno = errorCode;
+        perror("pthread_create error");
+        cleanResources(sharedData);
+        free(sharedData);
+        return EXIT_FAILURE;
+    }
+
+
+    while (!sharedData->childStarted){
         if(0 !=  sleep(0)){
             fprintf(stderr, "defective sleep");
-            cleanResources();
+            cleanResources(sharedData);
+            free(sharedData);
             return EXIT_FAILURE;
         }
     }
 
     int k = 0;
-
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
-        lockMutex(&mutex[(k + 1) % COUNT_OF_MUTEXES]);
+        lockMutex(&(sharedData->mutex[(k + 1) % COUNT_OF_MUTEXES]), sharedData);
 
         fprintf(stdout, "Main thread\n");
 
-        unlockMutex(&mutex[k]);
+        unlockMutex(&(sharedData->mutex[k]), sharedData);
         k = (k + 1) % COUNT_OF_MUTEXES;
     }
 
-    unlockMutex(&mutex[k]);
+    unlockMutex(&(sharedData->mutex[k]), sharedData);
 
     if (0 != (errorCode = pthread_join(thread, NULL))){
         errno = errorCode;
         perror("pthread_join error");
-        cleanResources();
+        cleanResources(sharedData);
+        free(sharedData);
         return EXIT_FAILURE;
     }
 
-    cleanResources();
+    cleanResources(sharedData);
+    free(sharedData);
 
     return EXIT_SUCCESS;
 }
