@@ -3,10 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sched.h>
 
 #define COUNT_OF_LINES_TO_PRINT 10
-#define COUNT_OF_MUTEXES 3
+#define COUNT_OF_MUTEXES 3  
 
 static pthread_mutex_t mutex[2];
 static pthread_mutexattr_t mutexAttr;
@@ -20,20 +19,19 @@ void unlockMutex(pthread_mutex_t*);
 
 
 void *printMessage(void *threadData) {
-    lockMutex(&mutex[0]);
+    lockMutex(&mutex[2]);
+    int k = 2;
     childStarted = 1;
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
-        lockMutex(&mutex[1]);
-        unlockMutex(&mutex[0]);
-        lockMutex(&mutex[2]);
-        unlockMutex(&mutex[1]);
+        lockMutex(&mutex[(k + 1) % COUNT_OF_MUTEXES]);
 
         fprintf(stdout, "Child thread\n");
 
-        lockMutex(&mutex[0]);
-        unlockMutex(&mutex[2]);
+        unlockMutex(&mutex[k]);
+        k = (k + 1) % COUNT_OF_MUTEXES;
     }
-    unlockMutex(&mutex[0]);
+
+    unlockMutex(&mutex[k]);
     return NULL;
 }
 
@@ -42,6 +40,7 @@ void lockMutex(pthread_mutex_t* mutex){
     if (0 != (errorCode = pthread_mutex_lock(mutex))){
         errno = errorCode;
         perror("pthread_mutex_lock error");
+        cleanResources();
         exit(EXIT_FAILURE);
     }
 }
@@ -51,6 +50,7 @@ void unlockMutex(pthread_mutex_t* mutex){
     if (0 != (errorCode = pthread_mutex_unlock(mutex))){
         errno = errorCode;
         perror("pthread_mutex_unlock error");
+        cleanResources();
         exit(EXIT_FAILURE);
     }
 }
@@ -105,38 +105,39 @@ int main(int argc, char *argv[]) {
 
     initMutexes();
 
-    lockMutex(&mutex[1]);
+    lockMutex(&mutex[0]);
     if (0 != (errorCode = pthread_create(&thread, NULL, printMessage, NULL))) {
         errno = errorCode;
         perror("pthread_create error");
+        cleanResources();
         return EXIT_FAILURE;
     }
 
-    if (!childStarted){
-        if(0 != (errorCode = sched_yield())){
-            errno = errorCode;
-            perror("sched_yield error");
+    while (!childStarted){
+        if(0 !=  sleep(0)){
+            fprintf(stderr, "defective sleep");
+            cleanResources();
             return EXIT_FAILURE;
         }
     }
 
+    int k = 0;
+
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
-        lockMutex(&mutex[2]);
-        unlockMutex(&mutex[1]);
+        lockMutex(&mutex[(k + 1) % COUNT_OF_MUTEXES]);
 
         fprintf(stdout, "Main thread\n");
 
-        lockMutex(&mutex[0]);
-        unlockMutex(&mutex[2]);
-        lockMutex(&mutex[1]);
-        unlockMutex(&mutex[0]);
+        unlockMutex(&mutex[k]);
+        k = (k + 1) % COUNT_OF_MUTEXES;
     }
 
-    unlockMutex(&mutex[1]);
+    unlockMutex(&mutex[k]);
 
     if (0 != (errorCode = pthread_join(thread, NULL))){
         errno = errorCode;
         perror("pthread_join error");
+        cleanResources();
         return EXIT_FAILURE;
     }
 
