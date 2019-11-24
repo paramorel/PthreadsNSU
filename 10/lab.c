@@ -12,7 +12,7 @@
 
 typedef struct SharedData{
     int childStarted;
-    pthread_mutex_t mutex[2];
+    pthread_mutex_t mutex[COUNT_OF_MUTEXES];
     pthread_mutexattr_t mutexAttr;
 } SharedData;
 
