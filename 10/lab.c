@@ -12,7 +12,7 @@
 
 typedef struct SharedData{
     int childStarted;
-    pthread_mutex_t mutex[COUNT_OF_MUTEXES];
+    pthread_mutex_t mutex[2];
     pthread_mutexattr_t mutexAttr;
 } SharedData;
 
@@ -61,7 +61,6 @@ void *printMessage(void *threadData){
 
 void lockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
     assert(NULL != sharedData);
-
     int errorCode = 0;
     errorCode = pthread_mutex_lock(mutex);
     exitBecauseError(errorCode, "pthread_mutex_lock error", sharedData);
@@ -69,7 +68,6 @@ void lockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
 
 void unlockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
     assert(NULL != sharedData);
-
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(mutex);
     exitBecauseError(errorCode, "pthread_mutex_unlock error", sharedData);
@@ -77,7 +75,6 @@ void unlockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
 
 void cleanResources(SharedData* sharedData){
     assert(NULL != sharedData);
-
     int errorCode = 0;
     for (int i = 0; i < COUNT_OF_MUTEXES; i++){
         if (0 != (errorCode = pthread_mutex_destroy(&(sharedData->mutex[i])))){
@@ -89,8 +86,8 @@ void cleanResources(SharedData* sharedData){
 
 void initMutexes(SharedData* sharedData){
     assert(NULL != sharedData);
-
     int errorCode = 0;
+    
     if(0 != (errorCode = pthread_mutexattr_init(&(sharedData->mutexAttr)))){
         errno = errorCode;
         perror("pthread_mutexattr_init error");
