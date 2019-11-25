@@ -125,6 +125,8 @@ int main(int argc, char *argv[]){
 
     initSharedData(sharedData);
 
+    lockMutex(sharedData);
+
     if (0 != (errorCode = pthread_create(&thread, NULL, printMessage, (void*)sharedData))) {
         errno = errorCode;
         perror("pthread_create error");
@@ -132,8 +134,6 @@ int main(int argc, char *argv[]){
         free(sharedData);
         return EXIT_FAILURE;
     }
-
-    lockMutex(sharedData);
 
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
         unlockConditional(sharedData);
