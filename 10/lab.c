@@ -12,7 +12,7 @@
 
 typedef struct SharedData{
     int childStarted;
-    pthread_mutex_t mutex[2];
+    pthread_mutex_t mutex[COUNT_OF_MUTEXES];
     pthread_mutexattr_t mutexAttr;
 } SharedData;
 
@@ -37,7 +37,6 @@ void exitBecauseError(int errorCode, char* message, SharedData* sharedData){
         exit(EXIT_FAILURE);
     }
 }
-
 
 void *printMessage(void *threadData){
     assert(NULL != threadData);
@@ -128,7 +127,6 @@ void initMutexes(SharedData* sharedData){
     }
 }
 
-
 int main(int argc, char *argv[]) {
     int errorCode = 0;
     pthread_t thread;
@@ -153,7 +151,6 @@ int main(int argc, char *argv[]) {
         free(sharedData);
         return EXIT_FAILURE;
     }
-
 
     while (!sharedData->childStarted){
         if(0 !=  sleep(0)){
