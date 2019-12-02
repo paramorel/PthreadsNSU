@@ -12,6 +12,7 @@
 typedef struct SharedData{
     pthread_mutex_t mutex;
     pthread_cond_t conditional;
+    int changeThread;
 } SharedData;
 
 void cleanResources(SharedData*);
@@ -20,7 +21,6 @@ void exitBecauseError(int, char*, SharedData*);
 void initSharedData(SharedData*);
 void lockMutex(SharedData*);
 void unlockMutex(SharedData*);
-void lockConditional(SharedData*);
 void unlockConditional(SharedData*);
 
 void exitBecauseError(int errorCode, char* message, SharedData* sharedData){
@@ -35,17 +35,10 @@ void exitBecauseError(int errorCode, char* message, SharedData* sharedData){
     }
 }
 
-void lockConditional(SharedData* sharedData){
-    assert(NULL != sharedData);
-    int errorCode = 0;
-    errorCode = pthread_cond_wait(&(sharedData->conditional), &(sharedData->mutex));
-    exitBecauseError(errorCode, "pthread_cond_wait error", sharedData);
-}
-
 void unlockConditional(SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
-    errorCode = pthread_cond_signal(&(sharedData->conditional));
+    errorCode = pthread_cond_broadcast(&(sharedData->conditional));
     exitBecauseError(errorCode, "pthread_cond_signal error", sharedData);
 }
 
@@ -79,21 +72,26 @@ void cleanResources(SharedData* sharedData){
 }
 
 void* printMessage(void* threadData){
+    int errorCode = 0;
     assert(NULL != threadData);
     SharedData* sharedData = (SharedData*)threadData;
 
     lockMutex(sharedData);
 
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
+        sharedData->changeThread = 0;
         unlockConditional(sharedData);
 
 	    fprintf(stdout, "Child thread\n");
 
-        lockConditional(sharedData);
+        while(!sharedData->changeThread){
+            errorCode = pthread_cond_wait(&(sharedData->conditional), &(sharedData->mutex));
+        }
+        exitBecauseError(errorCode, "pthread_cond_wait error", sharedData);
     }
 
+    sharedData->changeThread = 0;
     unlockMutex(sharedData);
-
     unlockConditional(sharedData);
 
     return NULL;
@@ -108,6 +106,7 @@ void initSharedData(SharedData* sharedData){
 
     errorCode = pthread_cond_init(&(sharedData->conditional), NULL);
     exitBecauseError(errorCode, "pthread_cond_init error ", sharedData);
+    sharedData->changeThread = 0;
 }
 
 
@@ -136,15 +135,19 @@ int main(int argc, char *argv[]){
     }
 
     for (int i = 0; i < COUNT_OF_LINES_TO_PRINT; i++){
+        sharedData->changeThread = 1;
         unlockConditional(sharedData);
 
 	    fprintf(stdout, "Main thread\n");
 
-        lockConditional(sharedData);
+        while(sharedData->changeThread){
+            errorCode = pthread_cond_wait(&(sharedData->conditional), &(sharedData->mutex));
+        }   
+        exitBecauseError(errorCode, "pthread_cond_wait error", sharedData);
     }
+    sharedData->changeThread = 1;
 
     unlockMutex(sharedData);
-
     unlockConditional(sharedData);
 
     if (0 != (errorCode = pthread_join(thread, NULL))){
