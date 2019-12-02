@@ -31,8 +31,6 @@ void exitBecauseError(int errorCode, char* message, SharedData* sharedData){
         }
 
         fprintf(stderr, message, strerror(errorCode));
-        cleanResources(sharedData);
-        free(sharedData);
         exit(EXIT_FAILURE);
     }
 }
@@ -77,6 +75,7 @@ void cleanResources(SharedData* sharedData){
         errno = errorCode;
         perror("pthread_cond_destroy error");
     }
+    free(sharedData);
 }
 
 void* printMessage(void* threadData){
@@ -129,9 +128,10 @@ int main(int argc, char *argv[]){
 
     if (0 != (errorCode = pthread_create(&thread, NULL, printMessage, (void*)sharedData))) {
         errno = errorCode;
+        
         perror("pthread_create error");
+        unlockMutex(sharedData);
         cleanResources(sharedData);
-        free(sharedData);
         return EXIT_FAILURE;
     }
 
@@ -151,12 +151,10 @@ int main(int argc, char *argv[]){
         errno = errorCode;
         perror("pthread_join error");
         cleanResources(sharedData);
-        free(sharedData);
         return EXIT_FAILURE;
     }
 
     cleanResources(sharedData);
-    free(sharedData);
 
     return EXIT_SUCCESS;
 }
