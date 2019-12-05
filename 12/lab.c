@@ -17,14 +17,13 @@ typedef struct SharedData{
 
 void cleanResources(SharedData*);
 void* printMessage(void*);
-void exitBecauseError(int, char*, SharedData*);
+void exitBecauseError(int, char*);
 void initSharedData(SharedData*);
 void lockMutex(SharedData*);
 void unlockMutex(SharedData*);
 void unlockConditional(SharedData*);
 
-void exitBecauseError(int errorCode, char* message, SharedData* sharedData){
-    assert(NULL != sharedData);
+void exitBecauseError(int errorCode, char* message){
     if (0 != errorCode){
         if (NULL == message){
             message = "error message ";
@@ -39,21 +38,21 @@ void unlockConditional(SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
     errorCode = pthread_cond_broadcast(&(sharedData->conditional));
-    exitBecauseError(errorCode, "pthread_cond_signal error", sharedData);
+    exitBecauseError(errorCode, "pthread_cond_signal error");
 }
 
 void lockMutex(SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
     errorCode = pthread_mutex_lock(&(sharedData->mutex));
-    exitBecauseError(errorCode, "pthread_mutex_lock error ", sharedData);
+    exitBecauseError(errorCode, "pthread_mutex_lock error ");
 }
 
 void unlockMutex(SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(&(sharedData->mutex));
-    exitBecauseError(errorCode, "pthread_mutex_unlock error ", sharedData);
+    exitBecauseError(errorCode, "pthread_mutex_unlock error ");
 }
 
 void cleanResources(SharedData* sharedData){
@@ -87,7 +86,7 @@ void* printMessage(void* threadData){
         while(!sharedData->changeThread){
             errorCode = pthread_cond_wait(&(sharedData->conditional), &(sharedData->mutex));
         }
-        exitBecauseError(errorCode, "pthread_cond_wait error", sharedData);
+        exitBecauseError(errorCode, "pthread_cond_wait error");
     }
 
     sharedData->changeThread = 0;
@@ -102,10 +101,10 @@ void initSharedData(SharedData* sharedData){
     int errorCode = 0;
 
     errorCode = pthread_mutex_init(&(sharedData->mutex), NULL);
-    exitBecauseError(errorCode, "pthread_mutex_init error ", sharedData);
+    exitBecauseError(errorCode, "pthread_mutex_init error ");
 
     errorCode = pthread_cond_init(&(sharedData->conditional), NULL);
-    exitBecauseError(errorCode, "pthread_cond_init error ", sharedData);
+    exitBecauseError(errorCode, "pthread_cond_init error ");
     sharedData->changeThread = 0;
 }
 
@@ -143,7 +142,7 @@ int main(int argc, char *argv[]){
         while(sharedData->changeThread){
             errorCode = pthread_cond_wait(&(sharedData->conditional), &(sharedData->mutex));
         }   
-        exitBecauseError(errorCode, "pthread_cond_wait error", sharedData);
+        exitBecauseError(errorCode, "pthread_cond_wait error");
     }
     sharedData->changeThread = 1;
 

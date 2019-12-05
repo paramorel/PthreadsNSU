@@ -21,11 +21,10 @@ void cleanResources(SharedData*);
 void* printMessage(void*);
 void lockMutex(pthread_mutex_t*, SharedData*);
 void unlockMutex(pthread_mutex_t*, SharedData*);
-void exitBecauseError(int, char*, SharedData*);
+void exitBecauseError(int, char*);
 
 
-void exitBecauseError(int errorCode, char* message, SharedData* sharedData){
-    assert(NULL != sharedData);
+void exitBecauseError(int errorCode, char* message){
     if (0 != errorCode){
         if (NULL == message){
             message = "error message";
@@ -60,14 +59,14 @@ void lockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
     errorCode = pthread_mutex_lock(mutex);
-    exitBecauseError(errorCode, "pthread_mutex_lock error", sharedData);
+    exitBecauseError(errorCode, "pthread_mutex_lock error");
 }
 
 void unlockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(mutex);
-    exitBecauseError(errorCode, "pthread_mutex_unlock error", sharedData);
+    exitBecauseError(errorCode, "pthread_mutex_unlock error");
 }
 
 void cleanResources(SharedData* sharedData){
