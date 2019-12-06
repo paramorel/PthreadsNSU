@@ -51,7 +51,8 @@ void cleanResources(SharedData* sharedData){
 void initSharedData(SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
-    if(0!= (errorCode = sem_init(&(sharedData->semaphore1), 0, 1))){
+    if(0!= (errorCode = sem_init(&(sharedData->semaphore1), 0, 1))){//если второй арумент имеет ненулевое значение, 
+                                                                    //то семафор разделяется между процессами
         errno = errorCode;
         perror("sem_init 1 error");
         free(sharedData);
