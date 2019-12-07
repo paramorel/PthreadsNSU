@@ -136,6 +136,11 @@ int main(int argc, char* argv[]){
     }
 
     if(0 != returnedValue){
+        if (-1 == waitpid(returnedValue, NULL, 0)){
+            perror("waitpid error");
+            exit(EXIT_FAILURE);
+        }
+
         closeSemaphores(sharedData);
         unlinkSemaphores(sharedData);
         free(sharedData);

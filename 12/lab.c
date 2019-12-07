@@ -152,7 +152,6 @@ int main(int argc, char *argv[]){
     if (0 != (errorCode = pthread_join(thread, NULL))){
         errno = errorCode;
         perror("pthread_join error");
-        cleanResources(sharedData);
         return EXIT_FAILURE;
     }
 
