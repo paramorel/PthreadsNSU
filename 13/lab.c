@@ -43,6 +43,7 @@ void cleanResources(SharedData* sharedData){
     if(0 !=(errorCode = sem_destroy(&sharedData->semaphore2))){
         errno = errorCode;
         perror("sem_destroy 2 error");
+        exit(EXIT_FAILURE);
     }
 
     free(sharedData);

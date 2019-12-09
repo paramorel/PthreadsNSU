@@ -19,8 +19,8 @@ typedef struct SharedData{
 void initMutexes(SharedData*);
 void cleanResources(SharedData*);
 void* printMessage(void*);
-void lockMutex(pthread_mutex_t*, SharedData*);
-void unlockMutex(pthread_mutex_t*, SharedData*);
+void lockMutex(pthread_mutex_t*);
+void unlockMutex(pthread_mutex_t*);
 void exitBecauseError(int, char*);
 
 
@@ -55,15 +55,13 @@ void *printMessage(void *threadData){
     return NULL;
 }
 
-void lockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
-    assert(NULL != sharedData);
+void lockMutex(pthread_mutex_t* mutex){
     int errorCode = 0;
     errorCode = pthread_mutex_lock(mutex);
     exitBecauseError(errorCode, "pthread_mutex_lock error");
 }
 
-void unlockMutex(pthread_mutex_t* mutex, SharedData* sharedData){
-    assert(NULL != sharedData);
+void unlockMutex(pthread_mutex_t* mutex){
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(mutex);
     exitBecauseError(errorCode, "pthread_mutex_unlock error");
@@ -76,6 +74,9 @@ void cleanResources(SharedData* sharedData){
         if (0 != (errorCode = pthread_mutex_destroy(&(sharedData->mutex[i])))){
             errno = errorCode;
             perror("pthread_mutex_destroy error");
+            if (COUNT_OF_MUTEXES - 1 == i){
+                exit(EXIT_FAILURE);
+            }
         }
     }
     free(sharedData);
@@ -172,7 +173,6 @@ int main(int argc, char *argv[]) {
     if (0 != (errorCode = pthread_join(thread, NULL))){
         errno = errorCode;
         perror("pthread_join error");
-        cleanResources(sharedData);
         return EXIT_FAILURE;
     }
 

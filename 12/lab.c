@@ -66,6 +66,7 @@ void cleanResources(SharedData* sharedData){
     if (0 != (errorCode = pthread_cond_destroy(&(sharedData->conditional)))){
         errno = errorCode;
         perror("pthread_cond_destroy error");
+        exit(EXIT_FAILURE);
     }
     free(sharedData);
 }
