@@ -8,6 +8,8 @@
 
 #define COUNT_OF_THREADS 2 
 #define MAX_LENGTH_OF_STRING 80
+#define LOCK_OR_UNLOCK_ERROR -1
+#define LOCK_OR_UNLOCK_SUCCESS 0
 
 typedef struct Node{
     char* data;
@@ -20,51 +22,36 @@ typedef struct SharedData{
     struct Node* head;
 }SharedData;
 
-void exitBecauseError(int, char*);
-void initSharedData(SharedData*);
 void cleanSharedData(SharedData*);
-void* sortingList(void*);
-void lockMutex(pthread_mutex_t*);
-void unlockMutex(pthread_mutex_t*);
+void* sortList(void*);
+int lockMutex(pthread_mutex_t*);
+int unlockMutex(pthread_mutex_t*);
 void printList(SharedData*);
-void addFirstElement(SharedData*, char*);
+Node* addFirstElement(SharedData*, char*);
 void swap(Node*, Node*);
 void destroyList(SharedData*);
 
-void exitBecauseError(int errorCode, char* message){
-    if (0 != errorCode){
-        if (NULL == message){
-            message = "error message ";
-        }
-        fprintf(stderr, message, strerror(errorCode));
-        exit(EXIT_FAILURE);
-    }
-}
 
-void lockMutex(pthread_mutex_t* mutex){
+int lockMutex(pthread_mutex_t* mutex){
     int errorCode = 0;
     errorCode = pthread_mutex_lock(mutex);
-    exitBecauseError(errorCode, "pthread_mutex_lock error");
+    if (0 != errorCode){
+        errno = errorCode;
+        perror("pthread_mutex_lock error");
+        return LOCK_OR_UNLOCK_ERROR;
+    }
+    return LOCK_OR_UNLOCK_SUCCESS;
 }
 
-void unlockMutex(pthread_mutex_t* mutex){
+int unlockMutex(pthread_mutex_t* mutex){
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(mutex);
-    exitBecauseError(errorCode, "pthread_mutex_unlock error");
-}
-
-void initSharedData(SharedData* sharedData){
-    assert(NULL != sharedData);
-    int errorCode = 0;
-    if(0!= (errorCode = pthread_mutex_init(&sharedData->mutex, NULL))){
+    if (0 != errorCode){
         errno = errorCode;
-        perror("pthread_mutex_init 1 error");
-        free(sharedData);
-        exit(EXIT_FAILURE);
-    } 
-
-    sharedData->head = NULL;
-    sharedData->currentListSize = 0;
+        perror("pthread_mutex_unlock error");
+        return LOCK_OR_UNLOCK_ERROR;
+    }
+    return LOCK_OR_UNLOCK_SUCCESS;
 }
 
 void cleanSharedData(SharedData* sharedData){
@@ -74,7 +61,6 @@ void cleanSharedData(SharedData* sharedData){
         errno = errorCode;
         perror("pthread_mutex_destroy error");
     }
-    sharedData->head = NULL;
 }
 
 void destroyList(SharedData* sharedData){
@@ -90,7 +76,6 @@ void destroyList(SharedData* sharedData){
 
 void printList(SharedData* sharedData){
     assert(NULL != sharedData);
-    lockMutex(&sharedData->mutex);
     Node* currentNode = sharedData->head;
     
     fprintf(stdout, "________Printing_________\n");
@@ -99,43 +84,57 @@ void printList(SharedData* sharedData){
 	    currentNode = currentNode->next;
     }
     fprintf(stdout, "________The end__________\n");
-    fprintf(stdout, "\n");
+    fprintf(stdout, "\n\n");
 
-    unlockMutex(&sharedData->mutex);
 }
 
-void addFirstElement(SharedData* sharedData, char* string){
+Node* addFirstElement(SharedData* sharedData, char* string){
     assert(NULL != sharedData);
+    int errorCode = 0;
     Node* newElement = NULL;
     Node* first = sharedData->head;
 
     if(NULL != first){
-        lockMutex(&sharedData->mutex);
+        if (LOCK_OR_UNLOCK_SUCCESS != lockMutex(&sharedData->mutex)){
+            return NULL;
+        }
+
         newElement = malloc(sizeof(Node));
 
-        if (NULL == sharedData){
+        if (NULL == newElement){
             fprintf(stderr, "Memory allocation error\n");
-            exit(EXIT_FAILURE);
+            return NULL;
         }
+
         sharedData->currentListSize += 1;
         newElement->next = first;
         newElement->data = string;
         sharedData->head = newElement;
-        unlockMutex(&sharedData->mutex);
+
+        if (LOCK_OR_UNLOCK_SUCCESS != unlockMutex(&sharedData->mutex)){
+            return NULL;
+        }
+
     } else {
-        lockMutex(&sharedData->mutex);
+        if (LOCK_OR_UNLOCK_SUCCESS != lockMutex(&sharedData->mutex)){
+            return NULL;
+        }
+
         newElement = malloc(sizeof(Node));
 
-        if (NULL == sharedData){
+        if (NULL == newElement){
             fprintf(stderr, "Memory allocation error\n");
-            exit(EXIT_FAILURE);
+            return NULL;
         }
         sharedData->currentListSize += 1;
         newElement->next = NULL;
         newElement->data = string;
         sharedData->head = newElement;
-        unlockMutex(&sharedData->mutex);
+        if (LOCK_OR_UNLOCK_SUCCESS != unlockMutex(&sharedData->mutex)){
+            return NULL;
+        }
     }
+    return newElement;
 }
 
 void swap(Node* a, Node* b){
@@ -144,7 +143,7 @@ void swap(Node* a, Node* b){
     b->data = tmp;
 }
 
-void* sortingList(void* threadData){
+void* sortList(void* threadData){
     assert(NULL !=  threadData);
     SharedData* sharedData = (SharedData*)threadData;
     
@@ -153,7 +152,10 @@ void* sortingList(void* threadData){
         Node* iteri = NULL;
 	    sleep(5);
 
-	    lockMutex(&sharedData->mutex);
+	    if (LOCK_OR_UNLOCK_SUCCESS != lockMutex(&sharedData->mutex)){
+            exit(EXIT_FAILURE);
+        }
+
 	    for (iteri = list; iteri; iteri = iteri->next) {
 	        Node* iterj = NULL;
 	        for (iterj = iteri->next; iterj; iterj = iterj->next) {
@@ -161,9 +163,13 @@ void* sortingList(void* threadData){
 		        swap(iteri, iterj);
 		    }
 	    }
-	}
-        unlockMutex(&sharedData->mutex);
+    }
+        
         printList(sharedData);
+
+        if (LOCK_OR_UNLOCK_SUCCESS != unlockMutex(&sharedData->mutex)){
+            exit(EXIT_FAILURE);
+        }
     }
     
     return NULL;
@@ -172,9 +178,9 @@ void* sortingList(void* threadData){
 
 int main(int argc, char* argv[]){
     int errorCode = 0;
-    int returnFromFgetc = 0;
     pthread_t sortingThread;
-    char* currentString = NULL;
+    Node* returned = NULL;
+    char* currentString = NULL; 
 
     SharedData* sharedData = (SharedData*)malloc(sizeof(SharedData) * COUNT_OF_THREADS);
 
@@ -183,12 +189,20 @@ int main(int argc, char* argv[]){
         return EXIT_FAILURE;
     }
 
-    initSharedData(sharedData);
+    if(0!= (errorCode = pthread_mutex_init(&sharedData->mutex, NULL))){
+        errno = errorCode;
+        perror("pthread_mutex_init error");
+        free(sharedData);
+        return EXIT_FAILURE;
+    } 
 
-    if (0 != (errorCode = pthread_create(&sortingThread, NULL, sortingList, (void*)sharedData))) {
+    sharedData->head = NULL;
+
+    if (0 != (errorCode = pthread_create(&sortingThread, NULL, sortList, (void*)sharedData))) {
         errno = errorCode;
         perror("pthread_create error");
         cleanSharedData(sharedData);
+        free(sharedData);
         return EXIT_FAILURE;
     }
 
@@ -209,11 +223,23 @@ int main(int argc, char* argv[]){
             if ('\n' == currentString[strlen(currentString) - 1]) {
                 currentString[strlen(currentString) - 1] = '\0';
             }
-		    addFirstElement(sharedData, currentString);
+		    returned = addFirstElement(sharedData, currentString);
+            if (NULL == returned){
+                return EXIT_FAILURE;
+            }
         }else {
+
+            if (LOCK_OR_UNLOCK_SUCCESS != lockMutex(&sharedData->mutex)){
+                return EXIT_FAILURE;
+            }
+
             printList(sharedData);
+
+            if (LOCK_OR_UNLOCK_SUCCESS != unlockMutex(&sharedData->mutex)){
+                return EXIT_FAILURE;
+            }
         }
     }
 
-    return EXIT_FAILURE;
+    return EXIT_SUCCESS;
 }

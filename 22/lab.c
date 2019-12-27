@@ -10,276 +10,286 @@
 #define TIME_FOR_A 1
 #define TIME_FOR_B 2
 #define TIME_FOR_C 3
-#define COUNT_OF_THREADS 5
-#define COUNT_OF_WIDGETS 5
-#define MAX_LENGTH_OF_INPUT_STRING 10
+#define COUNT_OF_THREADS 4
+#define COUNT_OF_WIDGETS 3
 #define CLEANUP_POP_ARGUMENT 1
+#define SUCCESS 0
+#define FAILURE -1
+#define A_ID 0
+#define B_ID 1
+#define C_ID 2
+#define MODULE_ID 3
+#define WIDGET_ID 4
 
-typedef struct SharedData{
-    sem_t semaphoreA;
-    sem_t semaphoreB;
-    sem_t semaphoreC;
-    sem_t semaphoreAB;
-}SharedData;
+typedef struct Semaphores{
+    sem_t* semaphore[COUNT_OF_THREADS];
+}Semaphores;
 
-typedef struct Threads{
-    pthread_t threadA;
-    pthread_t threadB;
-    pthread_t threadC;
-    pthread_t threadAB;
-}Threads;
+typedef struct LocalThreadData{
+    Semaphores* allSemaphores;
+    int threadID;
+}LocalThreadData;
 
-void exitBecauseError(int, char*);
-void initSharedData(SharedData*);
-void cleanResources(SharedData*);
-void wait(sem_t*);
-void post(sem_t*);
-void createWidget(SharedData*, Threads*);
-void* createA(void*);
-void* createB(void*);
-void* createC(void*);
-void* createAB(void*);
-void cancelThread(pthread_t*);
+int initLocalThreadData(LocalThreadData*);
+void* creator(void*);
+void cleanLocalThreadData(LocalThreadData*);
+int createDetail(LocalThreadData*);
+int createModule(LocalThreadData*);
 void cleanup(void*);
-
-void exitBecauseError(int errorCode, char* message){
-    if (0 != errorCode){
-        if (NULL == message){
-            message = "error message ";
-        }
-        fprintf(stderr, message, strerror(errorCode));
-        exit(EXIT_FAILURE);
-    }
-}
-
-void cleanResources(SharedData* sharedData){
-    assert(NULL != sharedData);
-    int errorCode = 0;
-    if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreA))){
-        errno = errorCode;
-        perror("sem_destroy A error");
-        exit(EXIT_FAILURE);
-    }
-    
-    if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreB))){
-        errno = errorCode;
-        perror("sem_destroy B error");
-        exit(EXIT_FAILURE);
-    }
-  
-    if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreC))){
-        errno = errorCode;
-        perror("sem_destroy C error");
-        exit(EXIT_FAILURE);
-    }
-   
-    if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreAB))){
-        errno = errorCode;
-        perror("sem_destroy AB error");
-        exit(EXIT_FAILURE);
-    }
-    free(sharedData);
-}
-
-void initSharedData(SharedData* sharedData){
-    assert(NULL != sharedData);
-    int errorCode = 0;
-    if(0!= (errorCode = sem_init(&(sharedData->semaphoreA), 0, 0))){
-        errno = errorCode;
-        perror("sem_init A error");
-        free(sharedData);
-        exit(EXIT_FAILURE);
-    } 
-
-    if(0 != (errorCode = sem_init(&(sharedData->semaphoreB), 0, 0))){
-        errno = errorCode;
-        perror("sem_init B error");
-        if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreA))){
-            errno = errorCode;
-            perror("sem_destroy A error");
-            exit(EXIT_FAILURE);
-        }    
-        free(sharedData);  
-        exit(EXIT_FAILURE);
-    } 
-    if(0 != (errorCode = sem_init(&(sharedData->semaphoreC), 0, 0))){
-        errno = errorCode;
-        perror("sem_init C error");
-        if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreA))){
-            errno = errorCode;
-            perror("sem_destroy A error");
-        }
-        if(0 != (errorCode = sem_destroy(&sharedData->semaphoreB))){
-            errno = errorCode;
-            perror("sem_destroy B error");
-            exit(EXIT_FAILURE);
-        }
-        free(sharedData);
-        exit(EXIT_FAILURE);
-    } 
-    if(0 != (errorCode = sem_init(&(sharedData->semaphoreAB), 0, 0))){
-        errno = errorCode;
-        perror("sem_init AB error");
-        if(0 !=(errorCode = sem_destroy(&sharedData->semaphoreA))){
-            errno = errorCode;
-            perror("sem_destroy A error");
-        }
-        if(0 != (errorCode = sem_destroy(&sharedData->semaphoreB))){
-            errno = errorCode;
-            perror("sem_destroy B error");
-            exit(EXIT_FAILURE);
-        }
-        if(0 != (errorCode = sem_destroy(&sharedData->semaphoreC))){
-            errno = errorCode;
-            perror("sem_destroy C error");
-            exit(EXIT_FAILURE);
-        }
-        free(sharedData);
-        exit(EXIT_FAILURE);
-    } 
-}
-
-void wait(sem_t* semaphore){
-    assert(NULL != semaphore);
-    int errorCode = 0;
-    errorCode = sem_wait(semaphore);
-    exitBecauseError(errorCode, "sem_wait error");
-}
-
-void post(sem_t* semaphore){
-    assert(NULL != semaphore);
-    int errorCode = 0;
-    errorCode = sem_post(semaphore);
-    exitBecauseError(errorCode, "sem_post error");
-}
-
-void* createA (void* threadData){
-    assert(NULL != threadData);
-    SharedData* sharedData = (SharedData*)threadData;
-    char* cleanupText = "thread A canceled";
-    pthread_cleanup_push(cleanup, cleanupText);
-    while(1){
-	    sleep(TIME_FOR_A);
-	    post(&sharedData->semaphoreA);    
-	    fprintf(stdout, "New detail A\n");
-    }
-    pthread_cleanup_pop(CLEANUP_POP_ARGUMENT);
-    return NULL;
-}
-
-void* createB (void* threadData){
-    assert(NULL != threadData);
-    SharedData* sharedData = (SharedData*)threadData;
-    char* cleanupText = "thread B canceled";
-    pthread_cleanup_push(cleanup, cleanupText);
-    while(1){
-	    sleep(TIME_FOR_B);
-	    post(&sharedData->semaphoreB);    
-	    fprintf(stdout, "New detail B\n");
-    }
-    pthread_cleanup_pop(CLEANUP_POP_ARGUMENT);
-    return NULL;
-}
-
-void* createC (void* threadData){
-    assert(NULL != threadData);
-    SharedData* sharedData = (SharedData*)threadData;
-    char* cleanupText = "thread C canceled";
-    pthread_cleanup_push(cleanup, cleanupText);
-    while(1){
-	    sleep(TIME_FOR_C);
-	    post(&sharedData->semaphoreC);    
-	    fprintf(stdout, "New detail C\n");
-    }
-    pthread_cleanup_pop(CLEANUP_POP_ARGUMENT);
-    return NULL;
-}
-
-void* createAB (void* threadData){
-    assert(NULL != threadData);
-    SharedData* sharedData = (SharedData*)threadData;
-    char* cleanupText = "thread AB canceled";
-    pthread_cleanup_push(cleanup, cleanupText);
-    while(1){
-        pthread_testcancel();
-	    wait(&sharedData->semaphoreA);
-	    wait(&sharedData->semaphoreB);
-	    post(&sharedData->semaphoreAB);
-	    fprintf(stdout, "New module AB\n");
-    }
-    pthread_cleanup_pop(CLEANUP_POP_ARGUMENT);
-    return NULL;
-}
-
-void createWidget(SharedData* sharedData, Threads* threads){
-    assert(NULL != sharedData);
-    assert(NULL !=threads);
-    int countOfWidgets = 0;
-    while(countOfWidgets < COUNT_OF_WIDGETS){
-        countOfWidgets++;
-	    wait(&sharedData->semaphoreAB);
-	    wait(&sharedData->semaphoreC);
-	    fprintf(stdout, "New widget\n");
-    }
-    cancelThread(&threads->threadA);
-    cancelThread(&threads->threadB);
-    cancelThread(&threads->threadC);
-    cancelThread(&threads->threadAB);
-
-    cleanResources(sharedData);
-}
 
 void cleanup(void* text){
     assert(NULL != text);
     char* cleanupText = (char*)text;
-    fprintf(stdout, "%s\n", cleanupText);
+    fprintf(stdout, "Thread that makes %s is canceled\n", cleanupText);
 }
 
-void cancelThread(pthread_t* thread){
+int post(sem_t* semaphore){
     int errorCode = 0;
-    assert(NULL != thread);
-    errorCode = pthread_cancel(*thread);
-    exitBecauseError(errorCode, "pthread_cancel error");
-    errorCode = pthread_join(*thread, NULL);
-    exitBecauseError(errorCode, "pthread_join error");
-}
-
-int main(int argc, char*argv[]){
-    int errorCode = 0;
-
-    Threads* threads = (Threads*)malloc(sizeof(Threads));
-
-    SharedData* sharedData = (SharedData*)malloc(sizeof(SharedData) * COUNT_OF_THREADS);
-    char* inputString = malloc(MAX_LENGTH_OF_INPUT_STRING * sizeof(char));
-
-    if (NULL == sharedData){
-        fprintf(stderr, "Memory allocation error\n");
-        return EXIT_FAILURE;
-    }
-
-    initSharedData(sharedData);
-
-
-    if (0 != (errorCode = pthread_create(&threads->threadA, NULL, createA, (void*)sharedData))) {
+    if (0 != (errorCode = sem_post(semaphore))){
         errno = errorCode;
-        perror("pthread_create error");
-        cleanResources(sharedData);
+        perror("sem_init error");
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+int wait(sem_t* semaphore){
+    int errorCode = 0;
+    if (0 != (errorCode = sem_wait(semaphore))){
+        errno = errorCode;
+        perror("sem_wait error");
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+int createDetail(LocalThreadData* localThreadData){//wait(detailSemaphore);
+    assert(NULL != localThreadData);
+    int timeToSleep = 0;
+    int errorCode = 0;
+    int countInStock = 0;
+    char* nameOfDetail = NULL;
+    int threadID = localThreadData->threadID;
+    sem_t* mySemaphore = localThreadData->allSemaphores->semaphore[threadID];
+
+    if (A_ID == threadID){
+        timeToSleep = TIME_FOR_A;
+        nameOfDetail = "A";
+    } else if (B_ID == threadID){
+        timeToSleep = TIME_FOR_B;
+        nameOfDetail = "B";
+    } else {
+        timeToSleep = TIME_FOR_C;
+        nameOfDetail = "C";
+    }
+    pthread_cleanup_push(cleanup, nameOfDetail);
+    while(1){
+	    sleep(timeToSleep);
+
+	    if (SUCCESS != post(mySemaphore)){
+            return FAILURE;
+        } 
+        if (0 != (errorCode = sem_getvalue(mySemaphore, &countInStock))){
+            errno = errorCode;
+            perror("error: sem_getvalue(detail semaphore) in createDetail");
+        }
+        fprintf(stdout, "%s IN STOCK %d (FROM CREATE DETAILS)\n", nameOfDetail, countInStock);
+
+	    fprintf(stdout, "New %s\n", nameOfDetail);
+    }
+    pthread_cleanup_pop(CLEANUP_POP_ARGUMENT);
+}
+
+int createModule(LocalThreadData* localThreadData){//wait(A), wait(B), post(AB)
+    assert(NULL != localThreadData);
+    int errorCode = 0;
+    int countInStock = 0;
+    char* cleanupText = "module from parts A and B";
+    sem_t* moduleSemaphore = localThreadData->allSemaphores->semaphore[MODULE_ID];
+    sem_t* semaphoreA = localThreadData->allSemaphores->semaphore[A_ID];
+    sem_t* semaphoreB = localThreadData->allSemaphores->semaphore[B_ID];
+    pthread_cleanup_push(cleanup, cleanupText);
+    while(1){
+        pthread_testcancel();
+
+	    if (SUCCESS != wait(semaphoreA)){
+            return FAILURE;
+        }
+        if (0 != (errorCode = sem_getvalue(semaphoreA, &countInStock))){
+            errno = errorCode;
+            perror("error: sem_getvalue(semaphoreA) in createModule");
+        }
+        fprintf(stdout, "A IN STOCK %d (FROM CREATE MODULE)\n", countInStock);
+
+	    if (SUCCESS != wait(semaphoreB)){
+            return FAILURE;
+        }
+        if (0 != (errorCode = sem_getvalue(semaphoreB, &countInStock))){
+            errno = errorCode;
+            perror("error: sem_getvalue(semaphoreB) in createModule");
+        }
+        fprintf(stdout, "B IN STOCK %d (FROM CREATE MODULE)\n", countInStock);
+
+	    if (SUCCESS != post(moduleSemaphore)){
+            return FAILURE;
+        }
+        if (0 != (errorCode = sem_getvalue(moduleSemaphore, &countInStock))){
+            errno = errorCode;
+            perror("error: sem_getvalue(moduleSemaphore) in createModule");
+        }
+        fprintf(stdout, "MODULES IN STOCK %d (FROM CREATE MODULE)\n", countInStock);
+
+	    fprintf(stdout, "New module AB\n");
+    }
+    pthread_cleanup_pop(CLEANUP_POP_ARGUMENT);
+}
+
+void* creator(void* threadData){
+    assert(NULL != threadData);
+    LocalThreadData* localThreadData = (LocalThreadData*)threadData;
+    int threadID = localThreadData->threadID;
+
+    if (A_ID == threadID || B_ID == threadID || C_ID == threadID){
+        if (SUCCESS != createDetail(localThreadData)){
+            exit(EXIT_FAILURE);
+        }
+    } else {
+        if (SUCCESS != createModule(localThreadData)){
+            exit(EXIT_FAILURE);
+        }
+    }
+    return NULL;
+}
+
+int createWidget(Semaphores* semaphores){//wait(AB), wait(C)
+    assert(NULL != semaphores);
+    int countOfWidgets = 0;
+    int countInStock = 0;
+    int errorCode = 0;
+    sem_t* semaphoreC = semaphores->semaphore[C_ID];
+    sem_t* semaphoreAB = semaphores->semaphore[MODULE_ID];
+
+    while(COUNT_OF_WIDGETS != countOfWidgets){
+        countOfWidgets++;
+
+        if (SUCCESS != wait(semaphoreAB)){
+            return FAILURE;
+        }
+        if (0 != (errorCode =sem_getvalue(semaphoreAB, &countInStock))){
+            errno = errorCode;
+            perror("error: set_getvalue(semaphoreAB) in createWidget");
+        }
+        fprintf(stdout, "MODULES IN STOCK %d (FROM CREATE WIDGET)\n", countInStock);
+
+
+        if (SUCCESS != wait(semaphoreC)){
+            return FAILURE;
+        }
+        if (0 != (errorCode =sem_getvalue(semaphoreC, &countInStock))){
+            errno = errorCode;
+            perror("error: set_getvalue(semaphoreC) in createWidget");
+        }
+        fprintf(stdout, "C IN STOCK %d (FROM CREATE WIDGET)\n", countInStock);
+
+        fprintf(stdout, "New widget\n");
+    }
+    return SUCCESS;
+}
+
+
+int destroySemaphore(sem_t* semaphore){
+    assert(NULL != semaphore);
+    int errorCode = 0;
+    if (0 != (errorCode = sem_destroy(semaphore))){
+        errno = errorCode;
+        perror("sem_destroy error");
+    }
+}
+
+
+int main(int argc, char** argv){
+    int errorCode = 0;
+    pthread_t threads[COUNT_OF_THREADS];
+    LocalThreadData* localThreadData[COUNT_OF_THREADS];
+    Semaphores* semaphores;
+    //fprintf(stdout, "11111");
+
+    semaphores = malloc(sizeof(Semaphores));
+    if (NULL == semaphores){
+        fprintf(stdout, "Memory allocation error");
         return EXIT_FAILURE;
     }
-    errorCode = pthread_create(&threads->threadB, NULL, createB, (void*)sharedData);
-    exitBecauseError(errorCode, "pthread_create B error");
 
-    errorCode = pthread_create(&threads->threadC, NULL, createC, (void*)sharedData);
-    exitBecauseError(errorCode, "pthread_create C error");
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        semaphores->semaphore[i] = malloc(sizeof(sem_t));
+        if(NULL == semaphores->semaphore[i]){
+            fprintf(stderr, "Memory allocation error");
+            return EXIT_FAILURE;
+        }
+    }
 
-    errorCode = pthread_create(&threads->threadAB, NULL, createAB, (void*)sharedData);
-    exitBecauseError(errorCode, "pthread_create AB error");
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        if (0 != (errorCode = sem_init(semaphores->semaphore[i], 0, 0))){
+            perror("sem_init error");
+            for(int j = 0; j < i; j++){
+                destroySemaphore(semaphores->semaphore[j]);
+            }
+            return EXIT_FAILURE;
+        }
+    }
 
-    createWidget(sharedData, threads);
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        if (NULL == (localThreadData[i] = malloc(sizeof(LocalThreadData)))){
+            fprintf(stderr, "Memory allocation error\n");
+            return EXIT_FAILURE;
+        }
+    }
 
-    free(inputString);
-    free(threads);
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        localThreadData[i]->threadID = i;
+        localThreadData[i]->allSemaphores = semaphores;
+        if (0 != (errorCode = pthread_create(&threads[i], NULL, creator, (void*)localThreadData[i]))){
+            perror("pthread_create error");
+                for (int j = 0; j < i; j++){
+                    if (0 != pthread_join(threads[i], NULL)){
+                        perror("pthread_join after pthread_create error");
+                    }
+                }
 
-    fprintf(stdout,"All structures deleted successfully\n");
+            for(int i = 0; i < COUNT_OF_THREADS; i++){
+                destroySemaphore(semaphores->semaphore[i]);
+            }
+            free(semaphores);
+            for (int i = 0; i < COUNT_OF_THREADS; i++){
+                free(localThreadData[i]);
+            }
+            return EXIT_FAILURE;
+        }
+    }
+
+    if (SUCCESS != createWidget(semaphores)){
+        return EXIT_FAILURE;
+    }
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        if (0 != (errorCode = pthread_cancel(threads[i]))){
+            errno = errorCode;
+            perror("pthread_cancel error");
+            return EXIT_FAILURE;
+        }
+        if (0 != (errorCode = pthread_join(threads[i], NULL))){
+            errno = errorCode;
+            perror("pthread_join error");
+            return EXIT_FAILURE;
+        }
+    }
+
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        destroySemaphore(semaphores->semaphore[i]);
+    }
+    free(semaphores);
+    for (int i = 0; i < COUNT_OF_THREADS; i++){
+        free(localThreadData[i]);
+    }
+
     return EXIT_SUCCESS;
 }
