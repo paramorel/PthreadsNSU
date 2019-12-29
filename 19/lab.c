@@ -10,7 +10,6 @@
 #define MAX_LENGTH_OF_STRING 80
 #define ERROR -1
 #define SUCCESS 0
-#define TIME_TO_SLEEP 5
 
 typedef struct Node{
     char* data;
@@ -18,38 +17,50 @@ typedef struct Node{
 }Node;
 
 typedef struct SharedData{
-    pthread_mutex_t mutex;
+    pthread_rwlock_t rwlock;
     int currentListSize;
     struct Node* head;
 }SharedData;
 
 void cleanSharedData(SharedData*);
 void* sortList(void*);
-int lockMutex(pthread_mutex_t*);
-int unlockMutex(pthread_mutex_t*);
+int readLock(pthread_rwlock_t*);
+int writeLock(pthread_rwlock_t*);
+int unlock(pthread_rwlock_t*);
 void printList(SharedData*);
 Node* addFirstElement(SharedData*, char*);
 void swap(Node*, Node*);
 void destroyList(SharedData*);
 
 
-int lockMutex(pthread_mutex_t* mutex){
+int readLock(pthread_rwlock_t* rwlock){
     int errorCode = 0;
-    errorCode = pthread_mutex_lock(mutex);
+    errorCode = pthread_rwlock_rdlock(rwlock);
     if (0 != errorCode){
         errno = errorCode;
-        perror("pthread_mutex_lock error");
+        perror("pthread_rwlock_rdlock error");
         return ERROR;
     }
     return SUCCESS;
 }
 
-int unlockMutex(pthread_mutex_t* mutex){
+int writeLock(pthread_rwlock_t* rwlock){
     int errorCode = 0;
-    errorCode = pthread_mutex_unlock(mutex);
+    errorCode = pthread_rwlock_wrlock(rwlock);
     if (0 != errorCode){
         errno = errorCode;
-        perror("pthread_mutex_unlock error");
+        perror("pthread_rwlock_wrlock error");
+        return ERROR;
+    }
+    return SUCCESS;
+}
+
+int unlock(pthread_rwlock_t* rwlock){
+    int errorCode = 0;
+    errorCode = pthread_rwlock_unlock(rwlock);
+    if (0 != errorCode){
+        errno = errorCode;
+        perror("pthread_rwlock_unlock error");
         return ERROR;
     }
     return SUCCESS;
@@ -58,7 +69,7 @@ int unlockMutex(pthread_mutex_t* mutex){
 void cleanSharedData(SharedData* sharedData){
     assert(NULL != sharedData);
     int errorCode = 0;
-    if(0 !=(errorCode = pthread_mutex_destroy(&sharedData->mutex))){
+    if(0 !=(errorCode = pthread_rwlock_destroy(&sharedData->rwlock))){
         errno = errorCode;
         perror("pthread_mutex_destroy error");
     }
@@ -97,7 +108,7 @@ Node* addFirstElement(SharedData* sharedData, char* string){
     Node* first = sharedData->head;
 
     if(NULL != first){
-        if (SUCCESS != lockMutex(&sharedData->mutex)){
+        if (SUCCESS != writeLock(&sharedData->rwlock)){
             return NULL;
         }
 
@@ -113,12 +124,12 @@ Node* addFirstElement(SharedData* sharedData, char* string){
         newElement->data = string;
         sharedData->head = newElement;
 
-        if (SUCCESS != unlockMutex(&sharedData->mutex)){
+        if (SUCCESS != unlock(&sharedData->rwlock)){
             return NULL;
         }
 
     } else {
-        if (SUCCESS != lockMutex(&sharedData->mutex)){
+        if (SUCCESS != writeLock(&sharedData->rwlock)){
             return NULL;
         }
 
@@ -132,7 +143,7 @@ Node* addFirstElement(SharedData* sharedData, char* string){
         newElement->next = NULL;
         newElement->data = string;
         sharedData->head = newElement;
-        if (SUCCESS != unlockMutex(&sharedData->mutex)){
+        if (SUCCESS != unlock(&sharedData->rwlock)){
             return NULL;
         }
     }
@@ -152,9 +163,9 @@ void* sortList(void* threadData){
     while (1){
         Node* list  = (Node*)sharedData->head;
         Node* iteri = NULL;
-	    sleep(TIME_TO_SLEEP);
+	    sleep(5);
 
-	    if (SUCCESS != lockMutex(&sharedData->mutex)){
+	    if (SUCCESS != writeLock(&sharedData->rwlock)){
             exit(EXIT_FAILURE);
         }
 
@@ -166,10 +177,17 @@ void* sortList(void* threadData){
 		    }
 	    }
     }
-        
+         if (SUCCESS != unlock(&sharedData->rwlock)){
+            exit(EXIT_FAILURE);
+        }
+
+        if (SUCCESS != readLock(&sharedData->rwlock)){
+            exit(EXIT_FAILURE);
+        }
+
         printList(sharedData);
 
-        if (SUCCESS != unlockMutex(&sharedData->mutex)){
+        if (SUCCESS != unlock(&sharedData->rwlock)){
             exit(EXIT_FAILURE);
         }
     }
@@ -182,8 +200,8 @@ int main(int argc, char* argv[]){
     int errorCode = 0;
     pthread_t sortingThread;
     Node* returned = NULL;
-    char* currentString = NULL; 
-    int SUCCESS_FINISH = 1;
+    char* currentString = NULL;
+    int SUCCESS_FINISH = 1; 
 
     SharedData* sharedData = (SharedData*)malloc(sizeof(SharedData) * COUNT_OF_THREADS);
 
@@ -192,9 +210,9 @@ int main(int argc, char* argv[]){
         return EXIT_FAILURE;
     }
 
-    if(0!= (errorCode = pthread_mutex_init(&sharedData->mutex, NULL))){
+    if(0!= (errorCode = pthread_rwlock_init(&sharedData->rwlock, NULL))){
         errno = errorCode;
-        perror("pthread_mutex_init error");
+        perror("pthread_rwlock_init error");
         free(sharedData);
         return EXIT_FAILURE;
     } 
@@ -235,17 +253,18 @@ int main(int argc, char* argv[]){
             }
         }else {
 
-            if (SUCCESS != lockMutex(&sharedData->mutex)){
+            if (SUCCESS != readLock(&sharedData->rwlock)){
                 return EXIT_FAILURE;
             }
 
             printList(sharedData);
 
-            if (SUCCESS != unlockMutex(&sharedData->mutex)){
+            if (SUCCESS != unlock(&sharedData->rwlock)){
                 return EXIT_FAILURE;
             }
         }
     }
+    
     
     if (0 != (errorCode = pthread_cancel(sortingThread))){
         errno = errorCode;
@@ -258,12 +277,12 @@ int main(int argc, char* argv[]){
         perror("pthread_join error");
         return EXIT_FAILURE;
     }
-
     cleanSharedData(sharedData);
     destroyList(sharedData);
-    
+
     if (!SUCCESS_FINISH){
         return EXIT_FAILURE;
-    }
+    } 
+
     return EXIT_SUCCESS;
 }

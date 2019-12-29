@@ -11,7 +11,7 @@
 #define TIME_FOR_B 2
 #define TIME_FOR_C 3
 #define COUNT_OF_THREADS 4
-#define COUNT_OF_WIDGETS 3
+#define COUNT_OF_WIDGETS 5
 #define CLEANUP_POP_ARGUMENT 1
 #define SUCCESS 0
 #define FAILURE -1
@@ -32,10 +32,11 @@ typedef struct LocalThreadData{
 
 int initLocalThreadData(LocalThreadData*);
 void* creator(void*);
-void cleanLocalThreadData(LocalThreadData*);
+int createWidget(Semaphores*);
 int createDetail(LocalThreadData*);
 int createModule(LocalThreadData*);
 void cleanup(void*);
+void destroySemaphore(sem_t*);
 
 void cleanup(void* text){
     assert(NULL != text);
@@ -197,7 +198,7 @@ int createWidget(Semaphores* semaphores){//wait(AB), wait(C)
 }
 
 
-int destroySemaphore(sem_t* semaphore){
+void destroySemaphore(sem_t* semaphore){
     assert(NULL != semaphore);
     int errorCode = 0;
     if (0 != (errorCode = sem_destroy(semaphore))){
@@ -212,7 +213,6 @@ int main(int argc, char** argv){
     pthread_t threads[COUNT_OF_THREADS];
     LocalThreadData* localThreadData[COUNT_OF_THREADS];
     Semaphores* semaphores;
-    //fprintf(stdout, "11111");
 
     semaphores = malloc(sizeof(Semaphores));
     if (NULL == semaphores){
