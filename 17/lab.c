@@ -1,4 +1,3 @@
-//TODO: подумать, надо ли блокировать голову всего списка, когда происходит сортировка
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -99,40 +98,36 @@ int printList(Node* head){
     assert(NULL != head);
     int errorCode = 0;
 
+    Node* node;
+    Node* prevNode = head;
+
+    fprintf(stdout, "________Printing_________\n");
+
     if (SUCCESS != lockMutex(&head->mutex)){
         return LOCK_OR_UNLOCK_ERROR;
     }
 
-    Node* node;
-    Node* prevNode;
-
-    fprintf(stdout, "________Printing_________\n");
-    node = head->next;
-
-    if (NULL != node){
-        if (SUCCESS != lockMutex(&node->mutex)){
-            return LOCK_OR_UNLOCK_ERROR;
-        }
-    }
-     
-    if (SUCCESS != unlockMutex(&head->mutex)){
-        return LOCK_OR_UNLOCK_ERROR;
-    }
+    node = head->next;      
 
     while(NULL != node){
-        fprintf(stdout, "%s\n", node->data);
-        prevNode = node;
-        node = node->next;
-        if (NULL != node){
-            if (SUCCESS != lockMutex(&node->mutex)){
-                return LOCK_OR_UNLOCK_ERROR;
-            }
+        if (SUCCESS != lockMutex(&node->mutex)){
+            return LOCK_OR_UNLOCK_ERROR;
         }
 
         if (SUCCESS != unlockMutex(&prevNode->mutex)){
             return LOCK_OR_UNLOCK_ERROR;
         }
+
+        fprintf(stdout, "%s\n", node->data);   
+        
+        prevNode = node;
+        node = node->next;
     }
+
+    if (SUCCESS != unlockMutex(&prevNode->mutex)){
+        return LOCK_OR_UNLOCK_ERROR;
+    }
+    
     fprintf(stdout, "________The end__________\n");
     fprintf(stdout, "\n\n");
 
@@ -184,22 +179,13 @@ void* sortList(void* threadData){
     assert(NULL !=  threadData);
     ThreadInfo* threadInfo = (ThreadInfo*)threadData;
 
-    if (SUCCESS != lockMutex(&threadInfo->list->mutex)){
-        exit(EXIT_FAILURE);
-    }
-
     Node* head = threadInfo->list;
-
-    if (SUCCESS != unlockMutex(&threadInfo->list->mutex)){
-        exit(EXIT_FAILURE);
-    }
 
     Node *first, *second, *third;
     int errorCode = 0;
     int notSorted;
     while (1) {
 	    sleep(TIME_TO_SLEEP);
-
 	    notSorted = 1;
 	    while (notSorted) {
 	        notSorted = 0;
@@ -270,7 +256,7 @@ int main(int argc, char* argv[]){
 
     for (int i = 0; i < COUNT_OF_SORTING_THREADS; i++){
         threadInfo[i] = malloc(sizeof(ThreadInfo));
-        if (NULL == threadInfo){
+        if (NULL == threadInfo[i]){
             fprintf(stderr, "Memory allocation error\n");
             destroyList(list);
             return EXIT_FAILURE;
