@@ -130,7 +130,7 @@ int main(int argc, char *argv[]){
         
         perror("pthread_create error");
         unlockMutex(sharedData);
-        cleanResources(sharedData);
+        cleanResources(sharedяData);
         return EXIT_FAILURE;
     }
 

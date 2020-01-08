@@ -10,6 +10,7 @@
 #define MAX_LENGTH_OF_STRING 80
 #define ERROR -1
 #define SUCCESS 0
+#define TIME_TO_SLEEP 5
 
 typedef struct Node{
     char* data;
@@ -34,6 +35,7 @@ void destroyList(SharedData*);
 
 
 int readLock(pthread_rwlock_t* rwlock){
+    assert(NULL != rwlock);
     int errorCode = 0;
     errorCode = pthread_rwlock_rdlock(rwlock);
     if (0 != errorCode){
@@ -45,6 +47,7 @@ int readLock(pthread_rwlock_t* rwlock){
 }
 
 int writeLock(pthread_rwlock_t* rwlock){
+    assert(NULL != rwlock);
     int errorCode = 0;
     errorCode = pthread_rwlock_wrlock(rwlock);
     if (0 != errorCode){
@@ -56,6 +59,7 @@ int writeLock(pthread_rwlock_t* rwlock){
 }
 
 int unlock(pthread_rwlock_t* rwlock){
+    assert(NULL != rwlock);
     int errorCode = 0;
     errorCode = pthread_rwlock_unlock(rwlock);
     if (0 != errorCode){
@@ -76,6 +80,7 @@ void cleanSharedData(SharedData* sharedData){
 }
 
 void destroyList(SharedData* sharedData){
+    assert(NULL != sharedData);
     Node* current = sharedData->head;
     Node* tmp = NULL;
     free(sharedData->head);
@@ -105,13 +110,13 @@ Node* addFirstElement(SharedData* sharedData, char* string){
     assert(NULL != string);
     int errorCode = 0;
     Node* newElement = NULL;
+
+    if (SUCCESS != readLock(&sharedData->rwlock)){
+            return NULL;
+    }
     Node* first = sharedData->head;
 
     if(NULL != first){
-        if (SUCCESS != writeLock(&sharedData->rwlock)){
-            return NULL;
-        }
-
         newElement = malloc(sizeof(Node));
 
         if (NULL == newElement){
@@ -129,10 +134,6 @@ Node* addFirstElement(SharedData* sharedData, char* string){
         }
 
     } else {
-        if (SUCCESS != writeLock(&sharedData->rwlock)){
-            return NULL;
-        }
-
         newElement = malloc(sizeof(Node));
 
         if (NULL == newElement){
@@ -150,10 +151,12 @@ Node* addFirstElement(SharedData* sharedData, char* string){
     return newElement;
 }
 
-void swap(Node* a, Node* b){
-    char* tmp = a->data;
-    a->data = b->data;
-    b->data = tmp;
+void swap(Node* first, Node* second){
+    assert(NULL != first);
+    assert(NULL != second);
+    char* tmp = first->data;
+    first->data = second->data;
+    second->data = tmp;
 }
 
 void* sortList(void* threadData){
@@ -161,9 +164,18 @@ void* sortList(void* threadData){
     SharedData* sharedData = (SharedData*)threadData;
     
     while (1){
+        if (SUCCESS != readLock(&sharedData->rwlock)){
+            exit(EXIT_FAILURE);
+        }
+
         Node* list  = (Node*)sharedData->head;
+
+        if (SUCCESS != unlock(&sharedData->rwlock)){
+            exit(EXIT_FAILURE);
+        }
+
         Node* iteri = NULL;
-	    sleep(5);
+        sleep(TIME_TO_SLEEP);
 
 	    if (SUCCESS != writeLock(&sharedData->rwlock)){
             exit(EXIT_FAILURE);
@@ -174,10 +186,10 @@ void* sortList(void* threadData){
 	        for (iterj = iteri->next; iterj; iterj = iterj->next) {
 	            if (0 < strcmp(iteri->data, iterj->data)) {       
 		        swap(iteri, iterj);
-		    }
-	    }
-    }
-         if (SUCCESS != unlock(&sharedData->rwlock)){
+		        }
+	        }
+        }
+        if (SUCCESS != unlock(&sharedData->rwlock)){
             exit(EXIT_FAILURE);
         }
 
@@ -264,7 +276,6 @@ int main(int argc, char* argv[]){
             }
         }
     }
-    
     
     if (0 != (errorCode = pthread_cancel(sortingThread))){
         errno = errorCode;

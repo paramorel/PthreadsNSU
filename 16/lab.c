@@ -34,6 +34,7 @@ void destroyList(SharedData*);
 
 
 int lockMutex(pthread_mutex_t* mutex){
+    assert(NULL != mutex);
     int errorCode = 0;
     errorCode = pthread_mutex_lock(mutex);
     if (0 != errorCode){
@@ -45,6 +46,7 @@ int lockMutex(pthread_mutex_t* mutex){
 }
 
 int unlockMutex(pthread_mutex_t* mutex){
+    assert(NULL != mutex);
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(mutex);
     if (0 != errorCode){
@@ -65,6 +67,7 @@ void cleanSharedData(SharedData* sharedData){
 }
 
 void destroyList(SharedData* sharedData){
+    assert(NULL != sharedData);
     Node* current = sharedData->head;
     Node* tmp = NULL;
     free(sharedData->head);
@@ -94,12 +97,13 @@ Node* addFirstElement(SharedData* sharedData, char* string){
     assert(NULL != string);
     int errorCode = 0;
     Node* newElement = NULL;
+    
+    if (SUCCESS != lockMutex(&sharedData->mutex)){
+        return NULL;
+    }
     Node* first = sharedData->head;
 
     if(NULL != first){
-        if (SUCCESS != lockMutex(&sharedData->mutex)){
-            return NULL;
-        }
 
         newElement = malloc(sizeof(Node));
 
@@ -118,10 +122,6 @@ Node* addFirstElement(SharedData* sharedData, char* string){
         }
 
     } else {
-        if (SUCCESS != lockMutex(&sharedData->mutex)){
-            return NULL;
-        }
-
         newElement = malloc(sizeof(Node));
 
         if (NULL == newElement){
@@ -139,10 +139,12 @@ Node* addFirstElement(SharedData* sharedData, char* string){
     return newElement;
 }
 
-void swap(Node* a, Node* b){
-    char* tmp = a->data;
-    a->data = b->data;
-    b->data = tmp;
+void swap(Node* first, Node* second){
+    assert(NULL != first);
+    assert(NULL != second);
+    char* tmp = first->data;
+    first->data = second->data;
+    second->data = tmp;
 }
 
 void* sortList(void* threadData){
@@ -150,8 +152,17 @@ void* sortList(void* threadData){
     SharedData* sharedData = (SharedData*)threadData;
     
     while (1){
+        if (SUCCESS != lockMutex(&sharedData->mutex)){
+            exit(EXIT_FAILURE);
+        }
         Node* list  = (Node*)sharedData->head;
+
+        if (SUCCESS != unlockMutex(&sharedData->mutex)){
+            exit(EXIT_FAILURE);
+        }
+
         Node* iteri = NULL;
+
 	    sleep(TIME_TO_SLEEP);
 
 	    if (SUCCESS != lockMutex(&sharedData->mutex)){
@@ -163,9 +174,9 @@ void* sortList(void* threadData){
 	        for (iterj = iteri->next; iterj; iterj = iterj->next) {
 	            if (0 < strcmp(iteri->data, iterj->data)) {       
 		        swap(iteri, iterj);
-		    }
-	    }
-    }
+		        }
+	        }
+        }
         
         printList(sharedData);
 

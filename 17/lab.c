@@ -1,3 +1,4 @@
+//TODO: подумать, надо ли блокировать голову всего списка, когда происходит сортировка
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -11,7 +12,7 @@
 #define SUCCESS 0
 #define TIME_TO_SLEEP 5
 #define LOCK_OR_UNLOCK_ERROR -2
-#define COUNT_OF_SORTING_THREADS 2
+#define COUNT_OF_SORTING_THREADS 3
 
 typedef struct Node{
     char* data;
@@ -20,7 +21,7 @@ typedef struct Node{
 }Node;
 
 typedef struct ThreadInfo{
-    Node* node;
+    Node* list;
     int threadID;
 }ThreadInfo;
 
@@ -35,6 +36,7 @@ int initList(Node*);
 
 
 int lockMutex(pthread_mutex_t* mutex){
+    assert(NULL != mutex);
     int errorCode = 0;
     errorCode = pthread_mutex_lock(mutex);
     if (0 != errorCode){
@@ -46,6 +48,7 @@ int lockMutex(pthread_mutex_t* mutex){
 }
 
 int unlockMutex(pthread_mutex_t* mutex){
+    assert(NULL != mutex);
     int errorCode = 0;
     errorCode = pthread_mutex_unlock(mutex);
     if (0 != errorCode){
@@ -169,22 +172,34 @@ int addFirstElement(Node* head, char* string){
     return SUCCESS;
 }
 
-void swap(Node* a, Node* b){
-    char* tmp = a->data;
-    a->data = b->data;
-    b->data = tmp;
+void swap(Node* first, Node* second){
+    assert(NULL != first);
+    assert(NULL != second);
+    char* tmp = first->data;
+    first->data = second->data;
+    second->data = tmp;
 }
 
 void* sortList(void* threadData){
     assert(NULL !=  threadData);
     ThreadInfo* threadInfo = (ThreadInfo*)threadData;
 
-    Node* head = threadInfo->node;
+    if (SUCCESS != lockMutex(&threadInfo->list->mutex)){
+        exit(EXIT_FAILURE);
+    }
+
+    Node* head = threadInfo->list;
+
+    if (SUCCESS != unlockMutex(&threadInfo->list->mutex)){
+        exit(EXIT_FAILURE);
+    }
+
     Node *first, *second, *third;
     int errorCode = 0;
     int notSorted;
     while (1) {
 	    sleep(TIME_TO_SLEEP);
+
 	    notSorted = 1;
 	    while (notSorted) {
 	        notSorted = 0;
@@ -264,7 +279,7 @@ int main(int argc, char* argv[]){
 
     for (int i = 0; i < COUNT_OF_SORTING_THREADS; i++){
         threadInfo[i]->threadID = i;
-        threadInfo[i]->node = list;
+        threadInfo[i]->list = list;
         if (0 != (errorCode = pthread_create(&sortingThread[i], NULL, sortList, (void*)threadInfo[i]))) {
             errno = errorCode;
             perror("pthread_create error");
